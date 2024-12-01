@@ -10,8 +10,8 @@ class Satellite:
     Table A.12-1 - Link Budget for Signaling Forward Link from Class-1 User Terminal (200 kHz bandwidth; Spot Beam)
     TDMA is taken from the example at section 6.6.2 on "Satellite Communication Systems - Systems, Techniques and Technologies, Gérard Maral, Michel Bousquet"
     The values are adapted in order to have at least 1bit per symbol with typical SNR values (reference papers: 
-    -High Throughput Satellite Systems: An Analytical Approach, H. FENECH, Fellow, IEEE, S. AMOS, A. TOMATIS, V. SOUMPHOLPHAKDY
-    -High Throughput Satellites - Delivering future capacity needs, ADL)
+    - High Throughput Satellite Systems: An Analytical Approach, H. FENECH, Fellow, IEEE, S. AMOS, A. TOMATIS, V. SOUMPHOLPHAKDY
+    - High Throughput Satellites - Delivering future capacity needs, ADL)
     """
     bs_type = "sat"
     #bs_id= None
@@ -47,7 +47,7 @@ class Satellite:
         self.total_users = 0
         self.frame_duration = 2 # lenght of the frame in milliseconds
         self.total_symbols = (self.frame_length - 288*2 - 64*2)#39104 - 288*2 - 64*2 #(self.frame_length - 288*2 - 64*2) # in a frame there are 2 reference burst made of 288 symbols each, with a guard time of 64 symbols between them and between any other burst
-        self.frame_utilization = 0  # allocated resources
+        self.frame_utilization = 0  # allocated PRB resources
         self.total_bitrate = total_bitrate
         self.allocated_bitrate = 0
         self.ue_allocation = {}
@@ -63,7 +63,10 @@ class Satellite:
 
     
     def compute_nsymb_SAT(self, data_rate, rsrp):
-        
+        """
+        compute OFDM symbol (i guess)
+        return transmitted symbol number and data rate calculated
+        """
         # compute SINR
         interference = 0
         for elem in rsrp:
@@ -77,18 +80,26 @@ class Satellite:
 
         r_64 = r * 64 # we can transmit in blocks of 64 symbols
 
-        n_symb = math.ceil(data_rate*1000000 / r_64)
+        n_symb = math.ceil(data_rate * 1000000 / r_64)
         return n_symb, r
 
     def compute_sinr(self, rsrp):
+        """
+        SINR = RSRP / (interferences + noise)
+        or RSRP = p_m(t) * |h_mn(t)|^2 (at form of power) 
+        h_mn(t): channel info state
+        p_m(t): transmit power for user m
+        
+        note: RSRP is average signal strength of reference signal measured by UE
+        """
         interference = 0
 
         for elem in rsrp:
             if elem != self.bs_id and util.find_bs_by_id(elem).bs_type == "sat":
-                interference = interference + (10 ** (rsrp[elem]/10))*util.find_bs_by_id(elem).compute_rbur()
+                interference = interference + (10 ** (rsrp[elem] / 10)) * util.find_bs_by_id(elem).compute_rbur()
   
-        thermal_noise = self.boltzmann*290*self.carrier_bnd*1000000
-        sinr = (10**(rsrp[self.bs_id]/10))/(thermal_noise + interference)
+        thermal_noise = self.boltzmann * 290 * self.carrier_bnd * 1000000
+        sinr = (10 ** (rsrp[self.bs_id] / 10)) / (thermal_noise + interference)
         return sinr
 
     def request_connection(self, ue_id, data_rate, rsrp):
@@ -113,6 +124,7 @@ class Satellite:
                 self.ue_allocation[ue_id] = 0
                 return 0
 
+        # allocate PRB
         if ue_id not in self.ue_allocation:
             self.ue_allocation[ue_id] = self.tb_header + N_symb*64 + self.guard_space
             self.frame_utilization += self.tb_header + N_symb*64 + self.guard_space
@@ -121,16 +133,16 @@ class Satellite:
             self.ue_allocation[ue_id] = self.tb_header + N_symb*64 + self.guard_space
             self.frame_utilization += self.ue_allocation[ue_id]
 
+        # allocate bit rate
         if ue_id not in self.ue_bitrate_allocation:
-            self.ue_bitrate_allocation[ue_id] = (r*N_symb*64)/1000000  
-            self.allocated_bitrate += (r*N_symb*64)/1000000
+            self.ue_bitrate_allocation[ue_id] = (r * N_symb * 64) / 1000000  
+            self.allocated_bitrate += self.ue_bitrate_allocation[ue_id]
         else:
             self.allocated_bitrate -= self.ue_bitrate_allocation[ue_id]
-            self.ue_bitrate_allocation[ue_id] = (r*N_symb*64)/1000000
-            self.allocated_bitrate += (r*N_symb*64)/1000000  
-        #print(r)
-        #print(N_symb)
-        return (r*N_symb*64)/1000000 #we want a data rate in Mbps, not in bps
+            self.ue_bitrate_allocation[ue_id] = (r * N_symb * 64) / 1000000
+            self.allocated_bitrate += self.ue_bitrate_allocation[ue_id]  
+
+        return self.ue_bitrate_allocation[ue_id] # we want a data rate in Mbps, not in bps
 
     def request_disconnection(self, ue_id):
         self.frame_utilization -= self.ue_allocation[ue_id]
@@ -218,7 +230,6 @@ class Satellite:
         
 
     def next_timestep(self):
-        #print(self.frame_utilization)
         self.resource_utilization_array[self.resource_utilization_counter] = self.frame_utilization
         self.resource_utilization_counter += 1
         if self.resource_utilization_counter % self.T == 0:
@@ -243,7 +254,7 @@ class Satellite:
         return self.total_symbols, self.frame_utilization
     
     def get_connection_info(self, ue_id):
-        return self.ue_allocation[ue_id]-self.tb_header-self.guard_space, self.total_symbols
+        return self.ue_allocation[ue_id] - self.tb_header-self.guard_space, self.total_symbols
 
     def get_connected_users(self):
         return list(self.ue_allocation.keys())
@@ -255,10 +266,12 @@ class Satellite:
     def compute_latency(self, ue_id):
         if ue_id in self.ue_allocation:
             return self.wardrop_alpha * self.ue_allocation[ue_id]/64 
-            #return self.wardrop_alpha * self.frame_utilization/64
         return 0
 
     def compute_r(self, ue_id, rsrp):
         N_symb, r = self.compute_nsymb_SAT(1, rsrp)
-        #we are interested in the r of a block, not of a single symbol
-        return r*64
+        # we are interested in the r of a block, not of a single symbol
+        return r * 64
+
+
+ 

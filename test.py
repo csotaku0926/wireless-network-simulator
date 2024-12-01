@@ -12,11 +12,14 @@ import pandas as pd
 TODO:
 - satellite mobility
 - channel allocation ?
+- integration with GYM
+    - RL algorithms
+
 """
 
 PLOT = False
 N_UE = 20
-ITER = 400   
+ITER = 100   
 
 SELECTED_UE = 3
 
@@ -40,6 +43,7 @@ for i in range(0, N_UE):
         direction = random.randint(0, 359)
     )
     ue.append(id)
+
 
 sat_bs = env.place_SAT_base_station(10000, (1000, 2000))
 bs.append(sat_bs)

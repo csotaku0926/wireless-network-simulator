@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 
-from UserEquipment import user_equipment
 
 class EnvType (Enum):
     RURAL = 0
@@ -73,7 +72,7 @@ def compute_path_loss_cost_hata(ue, bs, env, save = None):
 def find_bs_by_id(bs_id):
     return environment.wireless_environment.bs_list[bs_id]
 
-def find_ue_by_id(ue_id) -> user_equipment:
+def find_ue_by_id(ue_id):
     return environment.wireless_environment.ue_list[ue_id]
 
 

@@ -315,56 +315,53 @@ class user_equipment:
 
     def initial_timestep(self):
         rsrp = self.env.discover_bs(self.ue_id)
-        '''bs = max(rsrp, key = rsrp.get)
-        rsrp2 = {}
-        for elem in rsrp:
-            if elem != bs:
-                rsrp2[elem] = rsrp[elem]
-        bs2 = max(rsrp2, key = rsrp2.get)
-        self.bs_bitrate_allocation[bs] = self.requested_bitrate/2
-        self.bs_bitrate_allocation[bs2] = self.requested_bitrate/2
-        '''
         n = len(rsrp)
-        n1 = random.choice(list(rsrp))
-        if self.ue_id == 1 or self.ue_id == 19:
-            n1 = 0
-        if 4 in rsrp and random.random() < 0.9:
-            n1 = 4
+        # why ?
+        # n1 = random.choice(list(rsrp))
+        # if self.ue_id == 1 or self.ue_id == 19:
+        #     n1 = 0
+        # if 4 in rsrp and random.random() < 0.9:
+        #     n1 = 4
+        
+        # assign as requested bitrate (ue_class[self.ue_class])
         for elem in rsrp:
-            if elem != n1:
-                self.bs_bitrate_allocation[elem] = self.requested_bitrate/(n-1)
+            # if elem != n1:
+            self.bs_bitrate_allocation[elem] = self.requested_bitrate / n
+        
+        # why ?
         if self.ue_id == 2:
-                swap = self.bs_bitrate_allocation[0]*0.3
-                self.bs_bitrate_allocation[0] = self.bs_bitrate_allocation[0]*0.7
-                self.bs_bitrate_allocation[1] += swap
+            swap = self.bs_bitrate_allocation[0]*0.3
+            self.bs_bitrate_allocation[0] = self.bs_bitrate_allocation[0]*0.7
+            self.bs_bitrate_allocation[1] += swap
+        
         for elem in rsrp:
             if elem not in self.bs_bitrate_allocation:
-                #this means that it is the first time we encounter that base station
+                # this means that it is the first time we encounter that base station
                 self.bs_bitrate_allocation[elem] = 0
         
-        #compute wardrop sigma
-        self.wardrop_sigma = (self.env.wardrop_epsilon)/(2*self.env.sampling_time*self.env.wardrop_beta*self.requested_bitrate*(len(rsrp)-1)*len(self.env.ue_list))
+        # compute wardrop sigma
+        self.wardrop_sigma = (self.env.wardrop_epsilon) / \
+            (2 * self.env.sampling_time * self.env.wardrop_beta * self.requested_bitrate * (len(rsrp) - 1) * len(self.env.ue_list))
 
-        return
 
     def next_timestep(self):
         self.old_position = self.current_position
         self.move()
 
-        #compute the next state variable x^i_p[k+1], considering the visible base stations
+        # compute the next state variable x^i_p[k+1], considering the visible base stations
         rsrp = self.env.discover_bs(self.ue_id)
 
-        #remove the old BSs that are out of visibility
+        # remove the old BSs that are out of visibility
         for elem in self.bs_bitrate_allocation:
             if elem not in rsrp:
                 del self.bs_bitrate_allocation[elem]
 
-        #add the new BSs 
+        # add the new BSs 
         for elem in rsrp:
             if elem not in self.bs_bitrate_allocation:
                 self.bs_bitrate_allocation[elem] = 0
 
-        #core of the Wardrop algorithm
+        # core of the Wardrop algorithm
         for p in self.bs_bitrate_allocation:
             for q in self.bs_bitrate_allocation:
                 if p != q:
@@ -375,20 +372,24 @@ class user_equipment:
                     bs_q = util.find_bs_by_id(q)
                     l_q = bs_q.compute_latency(self.ue_id)
                     
+                    # determine next allocation using wardrop algorithm
                     mu_pq = 1
-                    if (l_p - l_q) < self.env.wardrop_epsilon or bs_q.allocated_bitrate >= bs_q.total_bitrate - (self.env.wardrop_epsilon/(2*self.env.wardrop_beta)):
+                    if (l_p - l_q) < self.env.wardrop_epsilon or \
+                        bs_q.allocated_bitrate >= \
+                        bs_q.total_bitrate - (self.env.wardrop_epsilon / (2 * self.env.wardrop_beta)):
                         mu_pq = 0
                     
                     mu_qp = 1
-                    if (l_q - l_p) < self.env.wardrop_epsilon or bs_p.allocated_bitrate >= bs_p.total_bitrate - (self.env.wardrop_epsilon/(2*self.env.wardrop_beta)):
+                    if (l_q - l_p) < self.env.wardrop_epsilon or \
+                        bs_p.allocated_bitrate >= \
+                        bs_p.total_bitrate - (self.env.wardrop_epsilon / (2 * self.env.wardrop_beta)):
                         mu_qp = 0
 
-                    r_pq = self.bs_bitrate_allocation[p]*mu_pq*self.wardrop_sigma
-                    r_qp = self.bs_bitrate_allocation[q]*mu_qp*self.wardrop_sigma
+                    r_pq = self.bs_bitrate_allocation[p] * mu_pq * self.wardrop_sigma
+                    r_qp = self.bs_bitrate_allocation[q] * mu_qp * self.wardrop_sigma
 
 
                     self.bs_bitrate_allocation[p] += self.env.sampling_time * (r_qp - r_pq)          
-        return
 
 
     def reset(self, t):
@@ -401,5 +402,13 @@ class user_equipment:
         self.last_action_t = t
 
         
+"""
+resource allocation
+self.bs_bitrate_allocation:
+- initial_timestep: determine initial value of allocation
+- next_timestep: determine allocation process based on RSRP
 
+then, based on `bs_bitrate_allocation`
+in `Satellite.py` line 136, 
+"""
     

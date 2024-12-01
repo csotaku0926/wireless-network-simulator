@@ -34,6 +34,7 @@ class wireless_environment:
             raise Exception("Invalid service class for the UE, available service classes are: %s" %(ue.ue_class.keys()))
         ue_id = -1
         
+        # ue_list is just [0,1,...] 
         if None in self.ue_list:
             ue_id = self.ue_list.index(None)
         else:
@@ -109,9 +110,8 @@ class wireless_environment:
     #this method shall be called by an UE 
     #that wants to have a measure of the RSRP 
     #associated to each BS
-    def discover_bs(self, ue_id):
+    def discover_bs(self, ue_id) -> dict:
        thread_pool = []
-       #rsrp = [None]*len(self.bs_list)
        rsrp = dict()
        with ThreadPoolExecutor(max_workers=len(self.bs_list)) as executor:
             for i in range(0, len(self.bs_list)):
@@ -119,10 +119,8 @@ class wireless_environment:
                 thread_pool.append(thread)
             for i in range(0, len(self.bs_list)):
                 res = thread_pool[i].result() 
-                #if res > -1000000:
                 if (res > util.MIN_RSRP):
                     rsrp[i] = res
-       #print(rsrp)
        return rsrp
 
     def initial_timestep(self):
