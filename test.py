@@ -8,15 +8,21 @@ import time
 import os
 import pandas as pd
 
+"""
+TODO:
+- satellite mobility
+- channel allocation ?
+"""
+
 PLOT = False
 N_UE = 20
-ITER = 40000    
+ITER = 400   
 
 SELECTED_UE = 3
 
 random.seed(2)
 
-
+# (width of map, sampling time)
 env = environment.wireless_environment(4000, sampling_time=0.001)
 ue = []
 bs = []
@@ -25,18 +31,22 @@ latency = {}
 prbs = {}
 bitrates = {}
 
+# insert UE
 for i in range(0, N_UE):
-    id = env.insert_ue(0, starting_position=(random.randint(0, env.x_limit-1), random.randint(0, env.y_limit-1), 1), speed = 0, direction = random.randint(0, 359))
-    #id = env.insert_ue(0, starting_position=(0, 0, 1), speed = 0, direction = random.randint(0, 359))
+    id = env.insert_ue(
+        0, 
+        starting_position=(random.randint(0, env.x_limit-1), random.randint(0, env.y_limit-1), 1), 
+        speed = 0, 
+        direction = random.randint(0, 359)
+    )
     ue.append(id)
 
 sat_bs = env.place_SAT_base_station(10000, (1000, 2000))
 bs.append(sat_bs)
 
-#nr_bs2 = env.place_NR_base_station((1500, 1500, 40), 800, 2, 20, 16, 3, 100, total_bitrate = 10000)
-
+# define BS's position, carrier freq, numer (?)...
 parm = [
-    #BS1
+    # BS1
     {"pos": (2000, 2000, 40),
     "freq": 800,
     "numerology": 1, 
@@ -46,7 +56,7 @@ parm = [
     "bandwidth": 20,
     "max_bitrate": 1000},
     
-    #BS2
+    # BS2
     {"pos": (1000, 1000, 40),
     "freq": 1700,
     "numerology": 1, 
@@ -56,7 +66,7 @@ parm = [
     "bandwidth": 40,
     "max_bitrate": 1000},
 
-    #BS3
+    # BS3
     {"pos": (2000, 500, 40),
     "freq": 1900,
     "numerology": 1, 
@@ -64,10 +74,10 @@ parm = [
     "gain": 5,
     "loss": 1,
     "bandwidth": 40,
-    #15
+    # 15
     "max_bitrate": 1000},
 
-    #BS4
+    # BS4
     {"pos": (3000, 1000, 40),
     "freq": 2000,
     "numerology": 1, 
@@ -77,7 +87,7 @@ parm = [
     "bandwidth": 25,
     "max_bitrate": 55},
 
-    #BS5
+    # BS5
     {"pos": (3000, 3000, 40),
     "freq": 1700,
     "numerology": 1, 
@@ -87,7 +97,7 @@ parm = [
     "bandwidth": 40,
     "max_bitrate": 1000},
 
-    #BS6
+    # BS6
     {"pos": (2000, 3500, 40),
     "freq": 1900,
     "numerology": 1, 
@@ -97,7 +107,7 @@ parm = [
     "bandwidth": 40,
     "max_bitrate": 1000},
 
-    #BS7
+    # BS7
     {"pos": (1000, 3000, 40),
     "freq": 2000,
     "numerology": 1, 
@@ -109,25 +119,33 @@ parm = [
 ]
 
 for i in range(len(parm)):
-    nr_bs2 = env.place_NR_base_station(parm[i]["pos"], parm[i]["freq"], parm[i]["numerology"], parm[i]["power"], parm[i]["gain"], parm[i]["loss"], parm[i]["bandwidth"], total_bitrate = parm[i]["max_bitrate"])
+    nr_bs2 = env.place_NR_base_station(
+        parm[i]["pos"], 
+        parm[i]["freq"], 
+        parm[i]["numerology"], 
+        parm[i]["power"], 
+        parm[i]["gain"], 
+        parm[i]["loss"], 
+        parm[i]["bandwidth"], 
+        total_bitrate = parm[i]["max_bitrate"]
+    )
     bs.append(nr_bs2)
 
 
-
-env.initial_timestep();
-print(env.wardrop_beta)
+env.initial_timestep()
+print(env.wardrop_beta) # define as max(1/r), where r is data rate
 
 #util.plot(ue, bs, env)
 #plt.pause(10)
 
+# just sugarcoating for calling all BS
 for phone in ue:
     util.find_ue_by_id(phone).connect_to_all_bs()
-#phone2.connect_to_bs_id(1)
-#phone2.connect_to_bs_id(0)
+
 env.next_timestep()
 #print(phone.bs_bitrate_allocation)
 
-for i in range(0,ITER):
+for i in range(0, ITER):
     if i % 100 == 0:
         print("-------------------", i, "-------------------")
         
@@ -162,15 +180,35 @@ for i in range(0,ITER):
         
         for bsi in bs:
             if util.find_bs_by_id(bsi).bs_type != "sat":
-                print("BS ", bsi, " PRB: ", util.find_bs_by_id(bsi).allocated_prb, "/", util.find_bs_by_id(bsi).total_prb, " Bitrate: ", util.find_bs_by_id(bsi).allocated_bitrate, "/", util.find_bs_by_id(bsi).total_bitrate)
+                print(
+                    "BS", 
+                    bsi, 
+                    "PRB:", 
+                    util.find_bs_by_id(bsi).allocated_prb, 
+                    "/", 
+                    util.find_bs_by_id(bsi).total_prb, 
+                    "Bitrate:", 
+                    util.find_bs_by_id(bsi).allocated_bitrate, 
+                    "/", 
+                    util.find_bs_by_id(bsi).total_bitrate
+                )
             else:
-                print("BS ", bsi, " PRB: ", util.find_bs_by_id(bsi).frame_utilization/64, "/", util.find_bs_by_id(bsi).total_symbols/64, " Bitrate: ", util.find_bs_by_id(bsi).allocated_bitrate, "/", util.find_bs_by_id(bsi).total_bitrate)
+                print(
+                    "BS", 
+                    bsi, 
+                    "PRB:", 
+                    util.find_bs_by_id(bsi).frame_utilization / 64,
+                    "/", 
+                    util.find_bs_by_id(bsi).total_symbols / 64, 
+                    "Bitrate:", 
+                    util.find_bs_by_id(bsi).allocated_bitrate, 
+                    "/", 
+                    util.find_bs_by_id(bsi).total_bitrate
+                )
         
     max_e = 0
     for phone in ue:
-        #print(phone)
         util.find_ue_by_id(phone).update_connection()
-    #phone2.update_connection()
         l_max = 0
         l_min = float("inf")
         latency_phone={}
@@ -206,29 +244,31 @@ for i in range(0,ITER):
               
 
     env.next_timestep()
-    #print(phone1.bs_bitrate_allocation)
 
 print("\n\n---------------------------------------------------\n\n")
 for phone in ue:
     print("UE %s: %s" %(phone, util.find_ue_by_id(phone).bs_bitrate_allocation))
 print("\n\n---------------------------------------------------\n\n")
-#print(latency)
 print(util.find_ue_by_id(3).current_position)
 
 ue_latency = {}
 
+# create data folder
+if (not os.path.isdir("data")):
+    os.makedirs("data")
+
 for phone in latency:
     df = pd.DataFrame.from_dict(latency[phone])
-    df.to_csv(".\\data\\latency_UE"+str(phone)+".csv", sep=";")
+    df.to_csv("data/latency_UE" + str(phone) + ".csv", sep=";")
 
 df = pd.DataFrame(error)
-df.to_csv(".\\data\\error.csv", sep=";")
+df.to_csv("data/error.csv", sep=";")
 
 for bsi in bs:
     df = pd.DataFrame.from_dict(prbs[bsi])
-    df.to_csv(".\\data\\resourceblocks_BS"+str(bsi)+".csv", sep=";")
+    df.to_csv("data/resource_blocks_BS" + str(bsi) + ".csv", sep=";")
     df = pd.DataFrame.from_dict(bitrates[bsi])
-    df.to_csv(".\\data\\bitrate_BS"+str(bsi)+".csv", sep=";")
+    df.to_csv("data/bitrate_BS" + str(bsi) + ".csv", sep=";")
 
 
 x = range(ITER)

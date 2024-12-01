@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import constants
+# from scipy import constants
 import math
 import util
 
@@ -55,6 +55,8 @@ class Satellite:
 
         self.wardrop_alpha = 0.5
 
+        self.boltzmann = 1.380649e-23 # Boltzmann Constant (J K^-1), replace scipy boltzman
+
         self.T = 10
         self.resource_utilization_array = [0] * self.T
         self.resource_utilization_counter = 0
@@ -62,12 +64,12 @@ class Satellite:
     
     def compute_nsymb_SAT(self, data_rate, rsrp):
         
-        #compute SINR
+        # compute SINR
         interference = 0
         for elem in rsrp:
             if elem != self.bs_id and util.find_bs_by_id(elem).bs_type == "sat":
                 interference = interference + (10 ** (rsrp[elem]/10))*util.find_bs_by_id(elem).compute_rbur()*(self.frame_utilization/self.total_symbols)  
-        thermal_noise = constants.Boltzmann*290*self.carrier_bnd*1000000
+        thermal_noise = self.boltzmann*290*self.carrier_bnd*1000000
         sinr = (10**(rsrp[self.bs_id]/10))/(thermal_noise + interference)
         r = self.carrier_bnd * 1000000 * math.log2(1 + sinr)
 
@@ -85,7 +87,7 @@ class Satellite:
             if elem != self.bs_id and util.find_bs_by_id(elem).bs_type == "sat":
                 interference = interference + (10 ** (rsrp[elem]/10))*util.find_bs_by_id(elem).compute_rbur()
   
-        thermal_noise = constants.Boltzmann*290*self.carrier_bnd*1000000
+        thermal_noise = self.boltzmann*290*self.carrier_bnd*1000000
         sinr = (10**(rsrp[self.bs_id]/10))/(thermal_noise + interference)
         return sinr
 
@@ -93,21 +95,21 @@ class Satellite:
         # this method will be called by an UE that tries to connect to this satellite.
         # the return value will be the actual datarate assigned to the user
 
-        #IMPORTANT: there must always be a guard space to be added to each allocation. This guard space is included  
+        # IMPORTANT: there must always be a guard space to be added to each allocation. This guard space is included  
         # in the frame utilization but not in the ue_allocation dictionary
 
         N_symb, r = self.compute_nsymb_SAT(data_rate, rsrp)
         
-        #check if there is enough bitrate
-        if self.total_bitrate-self.allocated_bitrate <= (r*N_symb*64)/1000000:
+        # check if there is enough bitrate
+        if self.total_bitrate - self.allocated_bitrate <= (r * N_symb * 64)/1000000:
             dr = self.total_bitrate - self.allocated_bitrate
             N_prb, r = self.compute_nsymb_SAT(dr, rsrp)
 
-        #check if there are enough symbols
+        # check if there are enough symbols
         if self.total_symbols - self.frame_utilization <= self.tb_header + N_symb*64 + self.guard_space:
             N_symb = math.floor((self.total_symbols - self.frame_utilization - self.guard_space - self.tb_header)/64)
             
-            if N_symb <= 0: #we can allocate at least 1 block of 64 symbols
+            if N_symb <= 0: # we can allocate at least 1 block of 64 symbols
                 self.ue_allocation[ue_id] = 0
                 return 0
 
@@ -136,9 +138,12 @@ class Satellite:
 
     
     def update_connection(self, ue_id, data_rate, rsrp):
-        # There are two cases: the first case is when an user has already some sybols allocated, the second case is when the user has no symbol allocated.
-        # In the first case self.ue_allocation[ue_id] contains already the header and some symbols, so we have just to add the remaining symbols (if there is room)
-        # In the second case self.ue_allocation[ue_id] is equal to 0, so we have to add the symbols, the header and the guard space. 
+        # There are two cases: 
+        # 1. when an user has already some sybols allocated, 
+        # 2. when the user has no symbol allocated.
+        # 
+        # In 1. self.ue_allocation[ue_id] contains already the header and some symbols, so we have just to add the remaining symbols (if there is room)
+        # In 2. self.ue_allocation[ue_id] is equal to 0, so we have to add the symbols, the header and the guard space. 
         # If there is no room for actual data symbols allocation (in the latter case), we still must have self.ue_allocation[ue_id]=0, since it is useless to allocate just the header and the guard space.
 
         N_symb, r = self.compute_nsymb_SAT(data_rate, rsrp)

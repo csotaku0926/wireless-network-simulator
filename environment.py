@@ -133,8 +133,9 @@ class wireless_environment:
             rsrp = self.discover_bs(ue.ue_id)
             for elem in rsrp:
                r = util.find_bs_by_id(elem).compute_r(ue.ue_id, rsrp)
-               if util.find_bs_by_id(elem).wardrop_alpha/(r/1000000) > self.wardrop_beta: #we convert r in Mbps
-                   self.wardrop_beta =  util.find_bs_by_id(elem).wardrop_alpha/(r/1000000)
+               wardrop_tmp = util.find_bs_by_id(elem).wardrop_alpha / (r / 1000000) # convert data rate in Mbps
+               self.wardrop_beta = max(self.wardrop_beta, wardrop_tmp)
+
         #now call each initial_timestep function in order to set the initial conditions for each commodity in terms of bitrate
         #to be requested to each BS
         for ue in self.ue_list:
